@@ -1,0 +1,17 @@
+[project]
+name = "kivy-launcher"
+version = "0.0.1"
+description = "Launch kivy app and pack them on and for Android."
+authors = [
+    {name = "maoist2009",email = "179199418+maoist2009@users.noreply.github.com"}
+]
+license = {text = "GPL-lv3-or-later"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
