@@ -60,7 +60,6 @@
     data_title: ""
     data_orientation: ""
     data_logo: "data/logo/kivy-icon-64.png"
-    data_orientation: ""
     data_author: ""
     data_entry: None
     padding: dp(4)
@@ -115,41 +114,38 @@ GridLayout:
                 default_size: None, dp(48)
                 default_size_hint: 1, None
 
-        RecycleView:
-            viewclass: 'LogLabel'
-            data: [{'text': log} for log in app.logs]
-            _top: 0
-            pos_hint: {'top': self._top, 'x': 0}
-            visible: app.display_logs
-            on_visible:
-                A.cancel_all(self, '_top')
-                A(_top=1 if self.visible else 0, d=.3, t='out_quad').start(self)
+        # ✅ FIXED: 日志区域（带背景、不重叠）
+        ScrollView:
+            size_hint: None, None
+            size: root.width, dp(120)
+            pos_hint: {'top': 1}
+            opacity: 1 if app.display_logs else 0
+            disabled: not app.display_logs
+            do_scroll_x: False
 
             canvas.before:
                 Color:
-                    rgba: rgba("#CCCCCCCC")
+                    rgba: rgba("#EEEEEEFF")  # 浅灰背景
                 Rectangle:
                     pos: self.pos
                     size: self.size
 
-            RecycleBoxLayout:
-                orientation: 'vertical'
+            Label:
                 size_hint_y: None
-                height: self.minimum_height
-                default_size_hint: None, None
-                default_size: 0, 20
-                padding: 5, 5
+                height: self.texture_size[1]
+                text_size: self.width - dp(10), None
+                text: '\\n'.join(app.logs)
+                color: rgba("#222222")
+                padding: [dp(5), dp(5)]
+                valign: 'top'
+                halign: 'left'
+                font_size: dp(12)
 
         Label:
             text:
                 '''
                 Please install applications in one of the following directories
                 - {}
-                '''.format('\n -'.join(app.paths))
+                '''.format('\\n - '.join(app.paths))
             pos_hint: {'pos': (0, 0)}
-            color: rgba("#222222" if not rv.data else "#00000000")
-
-<LogLabel@Label>:
-    color: rgba("#222222FF")
-    pos_hint: {'x': 0}
-    width: self.texture_size[0]
+            color: rgba("#222222" if rv.data else "#00000000")
