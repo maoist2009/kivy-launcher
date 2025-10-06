@@ -1,19 +1,20 @@
+# launcher/app.py
 # -*- coding: utf-8 -*-
 import os
-import re
+import json
 from datetime import datetime
 from kivy.lang import Builder
 from kivy.app import App
 from kivy.utils import platform
-from kivy.properties import ListProperty, BooleanProperty
+from kivy.properties import ListProperty, BooleanProperty, StringProperty, DictProperty
+from kivy.uix.screenmanager import ScreenManager, Screen
 from glob import glob
 from os.path import dirname, join, exists
 import traceback
 
 KIVYLAUNCHER_PATHS = os.environ.get("KIVYLAUNCHER_PATHS")
 
-
-class Launcher(App):
+class ProjectListScreen(Screen):
     paths = ListProperty()
     logs = ListProperty()
     display_logs = BooleanProperty(False)
@@ -22,26 +23,8 @@ class Launcher(App):
         print(log)
         self.logs.append(f"{datetime.now().strftime('%X.%f')}: {log}")
 
-    def build(self):
-        self.log('start of log')
-
-        if KIVYLAUNCHER_PATHS:
-            self.paths.extend(KIVYLAUNCHER_PATHS.split(","))
-
-        if platform == 'android':
-            from jnius import autoclass
-            Environment = autoclass('android.os.Environment')
-            sdcard_path = Environment.getExternalStorageDirectory().getAbsolutePath()
-            self.paths = [sdcard_path + "/kivy"]
-        else:
-            self.paths = [os.path.expanduser("~/kivy")]
-
-        self.root = Builder.load_file("launcher/app.kv")
+    def on_pre_enter(self):
         self.refresh_entries()
-
-        if platform == 'android':
-            from android.permissions import request_permissions, Permission
-            request_permissions([Permission.READ_EXTERNAL_STORAGE])
 
     def refresh_entries(self):
         data = []
@@ -56,41 +39,27 @@ class Launcher(App):
                 "data_author": entry.get("author", ""),
                 "data_entry": entry
             })
-        self.root.ids.rv.data = data
+        self.ids.rv.data = data
 
     def find_entries(self, path=None, paths=None):
-        self.log(f'looking for entries in paths={paths}, path={path}')
         if paths is not None:
             for p in paths:
                 yield from self.find_entries(path=p)
             return
-
         if path is None or not exists(path):
-            self.log(f'{path} does not exist')
             return
-
-        try:
-            self.log(f'listing dir: {os.listdir(path)}')
-        except Exception as e:
-            self.log(f'cannot list {path}: {e}')
-            return
-
-        # 查找 android.txt
+        # android.txt
         for filename in glob(join(path, "*/android.txt")):
-            self.log(f'found android.txt: {filename}')
             entry = self.read_android_txt(filename)
             if entry:
                 yield entry
-
-        # 查找 buildozer.spec
+        # buildozer.spec
         for filename in glob(join(path, "*/buildozer.spec")):
-            self.log(f'found buildozer.spec: {filename}')
             entry = self.read_buildozer_spec(filename)
             if entry:
                 yield entry
 
     def read_android_txt(self, filename):
-        """从 android.txt 读取 entry"""
         data = {}
         try:
             with open(filename, "r", encoding='utf-8') as fd:
@@ -102,57 +71,38 @@ class Launcher(App):
                     data[k.strip()] = v.strip()
         except Exception as e:
             self.log(f"Error reading android.txt {filename}: {e}")
-            traceback.print_exc()
             return None
-
         base_dir = dirname(filename)
         data["entrypoint"] = join(base_dir, "main.py")
         data["path"] = base_dir
-        # 确保关键字段有默认值
         data.setdefault("title", "- no title -")
         data.setdefault("author", "")
         data.setdefault("orientation", "")
         icon = join(base_dir, "icon.png")
-        if exists(icon):
-            data["logo"] = icon
-        else:
-            data["logo"] = "data/logo/kivy-icon-64.png"
+        data["logo"] = icon if exists(icon) else "data/logo/kivy-icon-64.png"
         return data
 
     def read_buildozer_spec(self, filename):
-        """从 buildozer.spec 读取 entry，解析 source.dir"""
         try:
             with open(filename, "r", encoding='utf-8') as fd:
                 content = fd.read()
         except Exception as e:
             self.log(f"Error reading buildozer.spec {filename}: {e}")
-            traceback.print_exc()
             return None
-
-        # 提取 source.dir
         match = re.search(r'^\s*source\.dir\s*=\s*(.+)$', content, re.MULTILINE)
         if not match:
-            self.log(f"buildozer.spec {filename} missing source.dir")
             return None
-
         source_dir = match.group(1).strip()
-        # 去除行尾注释（如 # (str) Source code...）
         if '#' in source_dir:
             source_dir = source_dir.split('#', 1)[0].strip()
-
         if not source_dir:
-            self.log(f"empty source.dir in {filename}")
             return None
-
         spec_dir = dirname(filename)
         main_dir = os.path.normpath(join(spec_dir, source_dir))
         main_py = join(main_dir, "main.py")
-
         if not exists(main_py):
-            self.log(f"main.py not found at {main_py} (resolved from buildozer.spec)")
             return None
 
-        # 尝试提取 title, author, orientation（可选）
         def get_spec_value(key):
             m = re.search(rf'^\s*{key}\s*=\s*(.+)$', content, re.MULTILINE)
             if m:
@@ -169,7 +119,6 @@ class Launcher(App):
             "entrypoint": main_py,
             "path": main_dir
         }
-
         icon = join(main_dir, "icon.png")
         data["logo"] = icon if exists(icon) else "data/logo/kivy-icon-64.png"
         return data
@@ -183,38 +132,74 @@ class Launcher(App):
     def start_desktop_activity(self, entry):
         import sys
         from subprocess import Popen
-        entrypoint = entry["entrypoint"]
         env = os.environ.copy()
-        env["KIVYLAUNCHER_ENTRYPOINT"] = entrypoint
+        env["KIVYLAUNCHER_ENTRYPOINT"] = entry["entrypoint"]
         main_py = os.path.realpath(os.path.join(
             os.path.dirname(__file__), "..", "main.py"))
-        cmd = Popen([sys.executable, main_py], env=env)
-        cmd.communicate()
+        Popen([sys.executable, main_py], env=env)
 
     def start_android_activity(self, entry):
-        self.log('starting activity')
         from jnius import autoclass
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
         System = autoclass("java.lang.System")
         activity = PythonActivity.mActivity
         Intent = autoclass("android.content.Intent")
         String = autoclass("java.lang.String")
-
-        j_entrypoint = String(entry.get("entrypoint"))
-        j_orientation = String(entry.get("orientation", ""))
-
-        self.log('creating intent')
-        intent = Intent(
-            activity.getApplicationContext(),
-            PythonActivity
-        )
-        intent.putExtra("entrypoint", j_entrypoint)
-        intent.putExtra("orientation", j_orientation)
-        self.log(f'ready to start intent {j_entrypoint} {j_orientation}')
+        intent = Intent(activity.getApplicationContext(), PythonActivity)
+        intent.putExtra("entrypoint", String(entry["entrypoint"]))
+        intent.putExtra("orientation", String(entry.get("orientation", "")))
         activity.startActivity(intent)
-        self.log('activity started')
         System.exit(0)
 
 
-if __name__ == '__main__':
-    Launcher().run()
+class ConfigEditorScreen(Screen):
+    config = DictProperty({})
+
+    def on_pre_enter(self):
+        from packman import get_config
+        self.config = get_config()
+
+    def save_config(self):
+        from packman import save_config
+        try:
+            # 从 TextInput 获取值
+            termux_repo = self.ids.termux_repo.text
+            pypi_index = self.ids.pypi_index.text
+            trusted_host = self.ids.trusted_host.text
+            new_config = {
+                "termux_repo": termux_repo,
+                "pypi_index_url": pypi_index,
+                "pypi_trusted_host": trusted_host
+            }
+            save_config(new_config)
+            self.manager.get_screen('project_list').log("✅ Config saved")
+            self.manager.current = 'project_list'
+        except Exception as e:
+            self.manager.get_screen('project_list').log(f"❌ Save failed: {e}")
+
+
+class LauncherApp(App):
+    def build(self):
+        # 初始化路径
+        if KIVYLAUNCHER_PATHS:
+            paths = KIVYLAUNCHER_PATHS.split(",")
+        elif platform == 'android':
+            from jnius import autoclass
+            Environment = autoclass('android.os.Environment')
+            sdcard = Environment.getExternalStorageDirectory().getAbsolutePath()
+            paths = [f"{sdcard}/kivy"]
+        else:
+            paths = [os.path.expanduser("~/kivy")]
+
+        sm = ScreenManager()
+        project_screen = ProjectListScreen(name='project_list')
+        project_screen.paths = paths
+        sm.add_widget(project_screen)
+        sm.add_widget(ConfigEditorScreen(name='config_editor'))
+        return sm
+
+    def open_config_editor(self):
+        self.root.current = 'config_editor'
+
+    def go_back(self):
+        self.root.current = 'project_list'

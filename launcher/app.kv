@@ -1,151 +1,121 @@
-#:import A kivy.animation.Animation
-#:import rgba kivy.utils.get_color_from_hex
-#:set ICON_PLAY "P"
-#:set ICON_REFRESH "R"
-#:set ICON_KIVY "K"
+# launcher/app.kv
+#:import Factory kivy.factory.Factory
 
-<IconLabel@Label>:
-    font_name: "data/kivylauncher.ttf"
-
-<IconButton@ButtonBehavior+IconLabel>
-    size_hint_x: None
-    width: self.height
-    canvas.before:
-        Color:
-            rgba: rgba("#ffffff66") if self.state == "down" else rgba("#00000000")
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-<LLabel@Label>:
-    text_size: self.width, None
-
-<TopBar@GridLayout>:
-    rows: 1
-    padding: dp(4)
-    size_hint_y: None
-    height: dp(48)
-    spacing: dp(10)
-    canvas.before:
-        Color:
-            rgba: rgba("#3F51B5")
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-    IconLabel:
-        text: ICON_KIVY
-        size_hint_x: None
-        width: self.height
-    Label:
-        text: "Kivy Launcher"
-        size_hint_x: None
-        width: self.texture_size[0]
-        font_size: dp(16)
-        font_name: "data/Roboto-Medium.ttf"
-
-    IconButton:
-        text: ICON_REFRESH
-        on_press:
-            app.refresh_entries()
-
-    ToggleButton:
-        text: 'Show logs' if self.state == 'normal' else 'Hide logs'
-        state: 'down' if app.display_logs else 'normal'
-        on_state:
-            app.display_logs = self.state == 'down'
-
-
-<LauncherEntry@BoxLayout>:
-    data_title: ""
-    data_orientation: ""
-    data_logo: "data/logo/kivy-icon-64.png"
-    data_author: ""
-    data_entry: None
-    padding: dp(4)
-    spacing: dp(8)
-    canvas.before:
-        Color:
-            rgba: rgba("#eeeef0")
-        Rectangle:
-            pos: self.x + self.height + self.padding[0], self.y - self.padding[1] / 2.
-            size: self.width, dp(1)
-
-    Image:
-        source: root.data_logo
-        size_hint_x: None
-        width: self.height
+<ProjectListScreen>:
     BoxLayout:
-        orientation: "vertical"
-        padding: 0, dp(4)
-        LLabel:
-            text: root.data_title
-            color: rgba("#454547")
-            font_name: "data/Roboto-Medium.ttf"
-            font_size: dp(13)
-        LLabel:
-            text: root.data_author
-            color: rgba("#b4b6b7")
-            font_size: dp(11)
-    IconButton:
-        text: ICON_PLAY
-        on_release: app.start_activity(root.data_entry)
-        color: rgba("#b4b6b8")
+        orientation: 'vertical'
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            padding: dp(10)
+            spacing: dp(10)
+            Button:
+                text: 'Refresh'
+                on_release: root.refresh_entries()
+            Button:
+                text: 'Config'
+                on_release: app.open_config_editor()
 
-
-GridLayout:
-    cols: 1
-    canvas.before:
-        Color:
-            rgba: rgba("#fafafc")
-        Rectangle:
-            size: self.size
-    TopBar
-    FloatLayout:
         RecycleView:
             id: rv
-            pos_hint: {'pos': (0, 0)}
-            viewclass: "LauncherEntry"
+            viewclass: 'ProjectItem'
             RecycleBoxLayout:
+                default_size: None, dp(80)
+                default_size_hint: 1, None
                 size_hint_y: None
                 height: self.minimum_height
-                orientation: "vertical"
-                spacing: dp(2)
-                default_size: None, dp(48)
-                default_size_hint: 1, None
+                orientation: 'vertical'
 
-        # ✅ FIXED: 日志区域（带背景、不重叠）
         ScrollView:
-            size_hint: None, None
-            size: root.width, dp(120)
-            pos_hint: {'top': 1}
-            opacity: 1 if app.display_logs else 0
-            disabled: not app.display_logs
-            do_scroll_x: False
-
-            canvas.before:
-                Color:
-                    rgba: rgba("#EEEEEEFF")  # 浅灰背景
-                Rectangle:
-                    pos: self.pos
-                    size: self.size
-
-            Label:
+            size_hint_y: None
+            height: dp(100) if root.display_logs else 0
+            GridLayout:
+                cols: 1
                 size_hint_y: None
-                height: self.texture_size[1]
-                text_size: self.width - dp(10), None
-                text: '\\n'.join(app.logs)
-                color: rgba("#222222")
-                padding: [dp(5), dp(5)]
-                valign: 'top'
-                halign: 'left'
-                font_size: dp(12)
+                height: self.minimum_height
+                Label:
+                    text: '\\n'.join(root.logs)
+                    size_hint_y: None
+                    height: self.texture_size[1]
+
+<ProjectItem@BoxLayout>:
+    orientation: 'horizontal'
+    padding: dp(10)
+    spacing: dp(10)
+    AsyncImage:
+        source: ctx.data_logo
+        size_hint_x: None
+        width: dp(64)
+    BoxLayout:
+        orientation: 'vertical'
+        Label:
+            text: ctx.data_title
+            font_size: '16sp'
+            halign: 'left'
+            text_size: self.size
+        Label:
+            text: f"Author: {ctx.data_author}" if ctx.data_author else ""
+            font_size: '12sp'
+            color: .5, .5, .5, 1
+        Label:
+            text: f"Path: {ctx.data_path}"
+            font_size: '10sp'
+            color: .3, .3, .3, 1
+    Button:
+        text: 'Run'
+        size_hint_x: None
+        width: dp(80)
+        on_release: app.root.get_screen('project_list').start_activity(ctx.data_entry)
+
+<ConfigEditorScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(20)
+        spacing: dp(15)
 
         Label:
-            text:
-                '''
-                Please install applications in one of the following directories
-                - {}
-                '''.format('\\n - '.join(app.paths))
-            pos_hint: {'pos': (0, 0)}
-            color: rgba("#222222" if rv.data else "#00000000")
+            text: 'Packman Config Editor'
+            font_size: '20sp'
+            size_hint_y: None
+            height: dp(40)
+
+        GridLayout:
+            cols: 2
+            spacing: dp(10)
+            size_hint_y: None
+            height: self.minimum_height
+
+            Label:
+                text: 'Termux Repo:'
+                halign: 'right'
+            TextInput:
+                id: termux_repo
+                text: root.config.get('termux_repo', '')
+                multiline: False
+
+            Label:
+                text: 'PyPI Index URL:'
+                halign: 'right'
+            TextInput:
+                id: pypi_index
+                text: root.config.get('pypi_index_url', '')
+                multiline: False
+
+            Label:
+                text: 'Trusted Host:'
+                halign: 'right'
+            TextInput:
+                id: trusted_host
+                text: root.config.get('pypi_trusted_host', '')
+                multiline: False
+
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(10)
+            Button:
+                text: 'Save'
+                on_release: root.save_config()
+            Button:
+                text: 'Cancel'
+                on_release: app.go_back()
