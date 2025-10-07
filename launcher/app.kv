@@ -71,48 +71,68 @@
     BoxLayout:
         orientation: 'vertical'
         padding: dp(20)
-        spacing: dp(15)
+        spacing: dp(20)
 
         Label:
             text: 'Packman Config Editor'
             font_size: '20sp'
             size_hint_y: None
             height: dp(40)
+            halign: 'center'
 
-        GridLayout:
-            cols: 2
-            spacing: dp(10)
-            size_hint_y: None
-            height: self.minimum_height
+        ScrollView:
+            GridLayout:
+                cols: 2
+                spacing: [dp(10), dp(15)]
+                size_hint_y: None
+                height: self.minimum_height
+                row_default_height: dp(40)
+                row_force_default: True
 
-            Label:
-                text: 'Termux Repo:'
-                halign: 'right'
-            TextInput:
-                id: termux_repo
-                text: root.config.get('termux_repo', '')
-                multiline: False
+                Label:
+                    text: 'Termux Repo:'
+                    halign: 'right'
+                    size_hint_y: None
+                    height: dp(40)
+                TextInput:
+                    id: termux_repo
+                    text: root.config.get('termux_repo', '')
+                    multiline: False
+                    size_hint_y: None
+                    height: dp(40)
+                    padding: [dp(10), dp(5)]
 
-            Label:
-                text: 'PyPI Index URL:'
-                halign: 'right'
-            TextInput:
-                id: pypi_index
-                text: root.config.get('pypi_index_url', '')
-                multiline: False
+                Label:
+                    text: 'PyPI Index URL:'
+                    halign: 'right'
+                    size_hint_y: None
+                    height: dp(40)
+                TextInput:
+                    id: pypi_index
+                    text: root.config.get('pypi_index_url', '')
+                    multiline: False
+                    size_hint_y: None
+                    height: dp(40)
+                    padding: [dp(10), dp(5)]
 
-            Label:
-                text: 'Trusted Host:'
-                halign: 'right'
-            TextInput:
-                id: trusted_host
-                text: root.config.get('pypi_trusted_host', '')
-                multiline: False
+                Label:
+                    text: 'Trusted Host:'
+                    halign: 'right'
+                    size_hint_y: None
+                    height: dp(40)
+                TextInput:
+                    id: trusted_host
+                    text: root.config.get('pypi_trusted_host', '')
+                    multiline: False
+                    size_hint_y: None
+                    height: dp(40)
+                    padding: [dp(10), dp(5)]
 
         BoxLayout:
             size_hint_y: None
             height: dp(50)
             spacing: dp(10)
+            padding: [0, dp(10)]
             Button:
                 text: 'Save'
                 on_release: root.save_config()
