@@ -48,13 +48,15 @@ android.presplash_color = #39C5BB
 # 权限（精简安全版）
 android.permissions =
     INTERNET,
+    READ_EXTERNAL_STORAGE,
+    WRITE_EXTERNAL_STORAGE
     MANAGE_EXTERNAL_STORAGE,
     FOREGROUND_SERVICE,
     WAKE_LOCK,
     REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
 
 # Target Android 10 (API 29)
-android.api = 30
+android.api = 28
 android.minapi = 21
 android.ndk = 25b
 android.archs = arm64-v8a, armeabi-v7a
